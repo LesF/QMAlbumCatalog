@@ -31,8 +31,6 @@ Begin VB.Form FormAlbumList
          BeginProperty Panel2 {8E3867AB-8586-11D1-B16A-00C0F0283628} 
             AutoSize        =   1
             Object.Width           =   10425
-            Text            =   "No action"
-            TextSave        =   "No action"
          EndProperty
       EndProperty
    End
@@ -111,11 +109,22 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
+
+'-----
+Dim isQMConnected As Boolean
 '-----
 
 Private Sub Form_Load()
     ConfigFolder = App.Title
+    isQMConnected = False
+    SetConnectState False
     RetrieveConfig
+    
+    If Len(SVC_Host) > 0 And Len(SVC_User) > 0 Then
+        'We have retrieved saved settings, try to connect
+        If ConnectQM() Then RetrieveCatalog
+    End If
+    If Not isQMConnected Then StatusBar1.Panels.Item(2).Text = "Configure settings then select Session/Connect"
 End Sub
 
 Private Sub Form_Resize()
@@ -127,7 +136,7 @@ Private Sub Form_Resize()
     clientW = FormAlbumList.ScaleWidth
     clientH = FormAlbumList.ScaleHeight - StatusBar1.Height
     pad = LVCatalog.Left
-    If clientW < (pad * 3) Then Exit Sub
+    If clientW < (pad * 5) Then Exit Sub
     If clientH < (pad * 10) Then Exit Sub
     '-----
     listW = clientW - (pad * 2)
@@ -147,6 +156,7 @@ End Sub
 
 Private Sub menuFileExit_Click()
     'TODO Clean up session and connection
+    QMDisconnectAll
     Unload Me
 End Sub
 
@@ -154,7 +164,27 @@ Private Sub menuFileSettings_Click()
     ShowConfig
 End Sub
 
-Private Sub RetrieveConfig()
+Private Sub menuSessionConnect_Click()
+    If ConnectQM() Then RetrieveCatalog
+End Sub
+
+Private Sub menuSessionDisconnect_Click()
+    QMDisconnectAll
+    isQMConnected = False
+    StatusBar1.Panels.Item(1).Text = "Not Connected"
+    SetConnectState False
+End Sub
+
+Public Sub ShowConfig()
+    FormServiceConfig.Show vbModal, Me
+    SVC_Host = IniRead("Connection", "Host", "undefined")
+    SVC_Port = CLng(IniRead("Connection", "Port", "4243"))
+    SVC_User = IniRead("Connection", "User", "")
+    SVC_Pass = IniRead("Connection", "Password", "")
+    SVC_Account = IniRead("Connection", "Account", "")
+End Sub
+
+Public Sub RetrieveConfig()
     'Retrieve config settings.  If not found pop up the settings dialog.
     SVC_Host = IniRead("Connection", "Host", "undefined")
     If Len(SVC_Host) = 0 Or SVC_Host = "undefined" Then
@@ -167,26 +197,54 @@ Private Sub RetrieveConfig()
     End If
 End Sub
 
-Private Sub ShowConfig()
-    FormServiceConfig.Show vbModal, Me
-    SVC_Host = IniRead("Connection", "Host", "undefined")
-    SVC_Port = CLng(IniRead("Connection", "Port", "4243"))
-    SVC_User = IniRead("Connection", "User", "")
-    SVC_Pass = IniRead("Connection", "Password", "")
-    SVC_Account = IniRead("Connection", "Account", "")
-End Sub
-
-Private Sub menuSessionConnect_Click()
-    'TODO
-    ' - connect to QM service
-    ' - set global flag indicating successful connection
-    ' - once connected, enable app controls and populate summary list
+Private Function ConnectQM() As Boolean
+    '-----
+    Dim gotConnect As Boolean
+    '-----
+    On Error GoTo ConnectError
+    QMDisconnectAll
+    isQMConnected = False
     StatusBar1.Panels.Item(1).Text = "Connecting"
-End Sub
+    StatusBar1.Panels.Item(2).Text = ""
+    LVCatalog.Enabled = False
+    gotConnect = QMConnect(SVC_Host, SVC_Port, SVC_User, SVC_Pass, SVC_Account)
+    If gotConnect Then
+        If QMConnected() <> 0 Then
+            StatusBar1.Panels.Item(1).Text = "Connected"
+            isQMConnected = True
+            SetConnectState True
+        Else
+            StatusBar1.Panels.Item(1).Text = "Connected: false"
+        End If
+    Else
+        StatusBar1.Panels.Item(1).Text = "Connect failed"
+    End If
+    Exit Function
+ConnectError:
+    'might fit something useful into the status panel?
+    StatusBar1.Panels.Item(1).Text = "Connect failed"
+    StatusBar1.Panels.Item(2).Text = "Connection error: " & Err.Description
+End Function
 
-Private Sub menuSessionDisconnect_Click()
-    'TODO
-    ' - disconnect + any cleanup required
-    ' - clear controls and disable whatever user shouldn't interact with
-    StatusBar1.Panels.Item(1).Text = "Not Connected"
+Private Function SetConnectState(isConnected As Boolean)
+    LVCatalog.Enabled = isConnected
+    menuAlbum.Enabled = isConnected
+    If Not isConnected Then LVCatalog.ListItems.Clear
+End Function
+
+Private Sub RetrieveCatalog()
+    '-----
+    
+    '-----
+    StatusBar1.Panels.Item(2).Text = "Retrieving catalog"
+    On Error GoTo ErrorHandler
+    '-----
+    'TODO load the album catalog into the listview
+    
+    
+    '-----
+    StatusBar1.Panels.Item(2).Text = "Catalog items: " & LVCatalog.ListItems.Count
+    Exit Sub
+ErrorHandler:
+    StatusBar1.Panels.Item(2).Text = "Error: " & Err.Description
 End Sub
