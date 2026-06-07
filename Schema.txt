@@ -9,7 +9,10 @@ YEAR           D      3                         Release Yr              S
 TRACKS         D      4                         Tracks                  M     TRACKINFO
 LENGTHS        D      5                         Track Length            M     TRACKINFO
 GENRES         D      6                         Genres                  M
+MEDIA.TYPE     D      7                         Media Type              S
 
+	- Media Type will use constants (Vinyl, Cassette, CD, DVD)
+	- Genres will be free text
 
 ARTISTS
 -------

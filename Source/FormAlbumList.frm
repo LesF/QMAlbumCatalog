@@ -115,7 +115,7 @@ Dim isQMConnected As Boolean
 '-----
 
 Private Sub Form_Load()
-    ConfigFolder = App.Title
+    ConfigFolder = App.title
     isQMConnected = False
     SetConnectState False
     RetrieveConfig
@@ -124,7 +124,7 @@ Private Sub Form_Load()
         'We have retrieved saved settings, try to connect
         If ConnectQM() Then RetrieveCatalog
     End If
-    If Not isQMConnected Then StatusBar1.Panels.Item(2).Text = "Configure settings then select Session/Connect"
+    If Not isQMConnected Then StatusBar1.Panels.item(2).Text = "Configure settings then select Session/Connect"
 End Sub
 
 Private Sub Form_Resize()
@@ -171,7 +171,7 @@ End Sub
 Private Sub menuSessionDisconnect_Click()
     QMDisconnectAll
     isQMConnected = False
-    StatusBar1.Panels.Item(1).Text = "Not Connected"
+    StatusBar1.Panels.item(1).Text = "Not Connected"
     SetConnectState False
 End Sub
 
@@ -204,26 +204,27 @@ Private Function ConnectQM() As Boolean
     On Error GoTo ConnectError
     QMDisconnectAll
     isQMConnected = False
-    StatusBar1.Panels.Item(1).Text = "Connecting"
-    StatusBar1.Panels.Item(2).Text = ""
+    StatusBar1.Panels.item(1).Text = "Connecting"
+    StatusBar1.Panels.item(2).Text = ""
     LVCatalog.Enabled = False
     gotConnect = QMConnect(SVC_Host, SVC_Port, SVC_User, SVC_Pass, SVC_Account)
     If gotConnect Then
         If QMConnected() <> 0 Then
-            StatusBar1.Panels.Item(1).Text = "Connected"
+            StatusBar1.Panels.item(1).Text = "Connected"
             isQMConnected = True
             SetConnectState True
+            ConnectQM = True
         Else
-            StatusBar1.Panels.Item(1).Text = "Connected: false"
+            StatusBar1.Panels.item(1).Text = "Connected: false"
         End If
     Else
-        StatusBar1.Panels.Item(1).Text = "Connect failed"
+        StatusBar1.Panels.item(1).Text = "Connect failed"
     End If
     Exit Function
 ConnectError:
     'might fit something useful into the status panel?
-    StatusBar1.Panels.Item(1).Text = "Connect failed"
-    StatusBar1.Panels.Item(2).Text = "Connection error: " & Err.Description
+    StatusBar1.Panels.item(1).Text = "Connect failed"
+    StatusBar1.Panels.item(2).Text = "Connection error: " & Err.Description
 End Function
 
 Private Function SetConnectState(isConnected As Boolean)
@@ -234,17 +235,66 @@ End Function
 
 Private Sub RetrieveCatalog()
     '-----
-    
+    Dim albumsFile As Integer, artistsFile As Integer
+    Dim albumId As String, rec As String
+    Dim artistId As String, artistName As String, artistRec As String
+    Dim title As String, mediaType As String
+    Dim errNo As Integer
+    Dim item As ListItem
     '-----
-    StatusBar1.Panels.Item(2).Text = "Retrieving catalog"
+    StatusBar1.Panels.item(2).Text = "Retrieving catalog"
     On Error GoTo ErrorHandler
     '-----
-    'TODO load the album catalog into the listview
+    LVCatalog.ListItems.Clear
     
+    albumsFile = QMOpen("ALBUMS")
+    If albumsFile = 0 Then
+        StatusBar1.Panels.item(2).Text = "Error: Could not open ALBUMS table"
+        Exit Sub
+    End If
     
+    artistsFile = QMOpen("ARTISTS")
+    
+    QMSelect albumsFile, 0
+    
+    Do
+        albumId = QMReadNext(0, errNo)
+        If errNo = SV_ELSE Then Exit Do    ' no more records in select list
+        
+        rec = QMRead(albumsFile, albumId, errNo)
+        If errNo <> SV_OK Then GoTo NextAlbum
+        
+        ' Schema: Field 1 = ARTIST.ID, Field 2 = TITLE, Field 7 = MEDIA.TYPE
+        artistId = QMExtract(rec, 1, 0, 0)
+        title = QMExtract(rec, 2, 0, 0)
+        mediaType = QMExtract(rec, 7, 0, 0)
+        
+        ' Look up artist name from ARTISTS table (Field 1 = NAME)
+        artistName = artistId  ' fallback: show ID if lookup fails
+        If artistsFile > 0 And Len(artistId) > 0 Then
+            artistRec = QMRead(artistsFile, artistId, errNo)
+            If errNo = SV_OK Then
+                artistName = QMExtract(artistRec, 1, 0, 0)
+            End If
+        End If
+        
+        ' ARTIST.ID is multivalued - show first value only
+        If InStr(artistName, Chr(253)) > 0 Then
+            artistName = Left(artistName, InStr(artistName, Chr(253)) - 1)
+        End If
+        
+        Set item = LVCatalog.ListItems.Add(, albumId, artistName)
+        item.SubItems(1) = title
+        item.SubItems(2) = mediaType
+
+NextAlbum:
+    Loop
+    
+    If artistsFile > 0 Then QMClose artistsFile
+    QMClose albumsFile
     '-----
-    StatusBar1.Panels.Item(2).Text = "Catalog items: " & LVCatalog.ListItems.Count
+    StatusBar1.Panels.item(2).Text = "Catalog items: " & LVCatalog.ListItems.Count
     Exit Sub
 ErrorHandler:
-    StatusBar1.Panels.Item(2).Text = "Error: " & Err.Description
+    StatusBar1.Panels.item(2).Text = "Error: " & Err.Description
 End Sub
