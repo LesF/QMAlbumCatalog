@@ -44,6 +44,7 @@ Begin VB.Form FormAlbumList
       _ExtentY        =   8493
       View            =   3
       Arrange         =   2
+      LabelEdit       =   1
       LabelWrap       =   -1  'True
       HideSelection   =   -1  'True
       FullRowSelect   =   -1  'True
@@ -112,6 +113,8 @@ Option Explicit
 
 '-----
 Dim isQMConnected As Boolean
+Private m_LastX As Single
+Private m_LastY As Single
 '-----
 
 Private Sub Form_Load()
@@ -124,7 +127,11 @@ Private Sub Form_Load()
         'We have retrieved saved settings, try to connect
         If ConnectQM() Then RetrieveCatalog
     End If
-    If Not isQMConnected Then StatusBar1.Panels.item(2).Text = "Configure settings then select Session/Connect"
+    If Not isQMConnected Then StatusBar1.Panels.Item(2).Text = "Configure settings then select Session/Connect"
+End Sub
+
+Private Sub Form_Unload(Cancel As Integer)
+    QMDisconnectAll
 End Sub
 
 Private Sub Form_Resize()
@@ -147,15 +154,25 @@ Private Sub Form_Resize()
 End Sub
 
 Private Sub menuAlbumEdit_Click()
-    'TODO make edit dialog
+    Dim albumId As String
+    Dim dlg As FormEditAlbum
+    If Not LVCatalog.SelectedItem Is Nothing Then
+        albumId = LVCatalog.SelectedItem.Key
+        Debug.Print "Edit '" & albumId & "'"
+        Set dlg = New FormEditAlbum
+        dlg.albumId = albumId
+        dlg.Show vbModal, Me
+        RetrieveCatalog
+    End If
 End Sub
 
 Private Sub menuAlbumNew_Click()
-    'TODO make edit dialog
+    FormEditAlbum.albumId = "_new_"
+    FormEditAlbum.Show vbModal, Me
+    RetrieveCatalog
 End Sub
 
 Private Sub menuFileExit_Click()
-    'TODO Clean up session and connection
     QMDisconnectAll
     Unload Me
 End Sub
@@ -171,7 +188,7 @@ End Sub
 Private Sub menuSessionDisconnect_Click()
     QMDisconnectAll
     isQMConnected = False
-    StatusBar1.Panels.item(1).Text = "Not Connected"
+    StatusBar1.Panels.Item(1).Text = "Not Connected"
     SetConnectState False
 End Sub
 
@@ -204,27 +221,27 @@ Private Function ConnectQM() As Boolean
     On Error GoTo ConnectError
     QMDisconnectAll
     isQMConnected = False
-    StatusBar1.Panels.item(1).Text = "Connecting"
-    StatusBar1.Panels.item(2).Text = ""
+    StatusBar1.Panels.Item(1).Text = "Connecting"
+    StatusBar1.Panels.Item(2).Text = ""
     LVCatalog.Enabled = False
     gotConnect = QMConnect(SVC_Host, SVC_Port, SVC_User, SVC_Pass, SVC_Account)
     If gotConnect Then
         If QMConnected() <> 0 Then
-            StatusBar1.Panels.item(1).Text = "Connected"
+            StatusBar1.Panels.Item(1).Text = "Connected"
             isQMConnected = True
             SetConnectState True
             ConnectQM = True
         Else
-            StatusBar1.Panels.item(1).Text = "Connected: false"
+            StatusBar1.Panels.Item(1).Text = "Connected: false"
         End If
     Else
-        StatusBar1.Panels.item(1).Text = "Connect failed"
+        StatusBar1.Panels.Item(1).Text = "Connect failed"
     End If
     Exit Function
 ConnectError:
     'might fit something useful into the status panel?
-    StatusBar1.Panels.item(1).Text = "Connect failed"
-    StatusBar1.Panels.item(2).Text = "Connection error: " & Err.Description
+    StatusBar1.Panels.Item(1).Text = "Connect failed"
+    StatusBar1.Panels.Item(2).Text = "Connection error: " & Err.Description
 End Function
 
 Private Function SetConnectState(isConnected As Boolean)
@@ -240,16 +257,16 @@ Private Sub RetrieveCatalog()
     Dim artistId As String, artistName As String, artistRec As String
     Dim title As String, mediaType As String
     Dim errNo As Integer
-    Dim item As ListItem
+    Dim Item As ListItem
     '-----
-    StatusBar1.Panels.item(2).Text = "Retrieving catalog"
+    StatusBar1.Panels.Item(2).Text = "Retrieving catalog"
     On Error GoTo ErrorHandler
     '-----
     LVCatalog.ListItems.Clear
     
     albumsFile = QMOpen("ALBUMS")
     If albumsFile = 0 Then
-        StatusBar1.Panels.item(2).Text = "Error: Could not open ALBUMS table"
+        StatusBar1.Panels.Item(2).Text = "Error: Could not open ALBUMS table"
         Exit Sub
     End If
     
@@ -283,18 +300,40 @@ Private Sub RetrieveCatalog()
             artistName = Left(artistName, InStr(artistName, Chr(253)) - 1)
         End If
         
-        Set item = LVCatalog.ListItems.Add(, albumId, artistName)
-        item.SubItems(1) = title
-        item.SubItems(2) = mediaType
+        'Add(index, key, text)
+        Set Item = LVCatalog.ListItems.Add(, albumId, artistName)
+        Item.SubItems(1) = title
+        Item.SubItems(2) = mediaType
 
 NextAlbum:
     Loop
     
     If artistsFile > 0 Then QMClose artistsFile
     QMClose albumsFile
+    Call AutoSizeListViewColumns(LVCatalog, False)
+    Call AutoSizeListViewColumnsFillLast(LVCatalog)
     '-----
-    StatusBar1.Panels.item(2).Text = "Catalog items: " & LVCatalog.ListItems.Count
+    StatusBar1.Panels.Item(2).Text = "Catalog items: " & LVCatalog.ListItems.Count
     Exit Sub
 ErrorHandler:
-    StatusBar1.Panels.item(2).Text = "Error: " & Err.Description
+    StatusBar1.Panels.Item(2).Text = "Error: " & Err.Description
 End Sub
+
+Private Sub LVCatalog_MouseDown(Button As Integer, Shift As Integer, x As Single, y As Single)
+    m_LastX = x
+    m_LastY = y
+End Sub
+
+Private Sub LVCatalog_DblClick()
+    Dim itm As ListItem
+
+    Set itm = LVCatalog.HitTest(m_LastX, m_LastY)
+    If itm Is Nothing Then
+        ' User double-clicked empty space — ignore
+        Exit Sub
+    End If
+    ' Otherwise, they clicked a real row
+    Call menuAlbumEdit_Click
+End Sub
+
+
