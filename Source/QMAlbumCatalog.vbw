@@ -1,0 +1,5 @@
+FormAlbumList = 0, 0, 1181, 642, Z, 286, 286, 1467, 928, C
+QMClient = 0, 0, 0, 0, C
+ModConfig = 72, 133, 1253, 775, C
+Globals = 52, 52, 1233, 694, C
+FormServiceConfig = 104, 104, 1230, 746, , 78, 78, 1259, 720, C

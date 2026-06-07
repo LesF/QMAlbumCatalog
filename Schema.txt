@@ -1,0 +1,25 @@
+ALBUMS
+------
+@ID.........   TYPE   LOC...........   CONV..   NAME........   FORMAT   S/M   ASSOC...
+@ID            D      0                         ALBUMS         10L      S
+ALBUM.ID       D      0                         Record ID               S
+ARTIST.ID      D      1                         Artist ID               m
+TITLE          D      2                         Album Title             S
+YEAR           D      3                         Release Yr              S
+TRACKS         D      4                         Tracks                  M     TRACKINFO
+LENGTHS        D      5                         Track Length            M     TRACKINFO
+GENRES         D      6                         Genres                  M
+
+
+ARTISTS
+-------
+@ID.........   TYPE   LOC...........   CONV..   NAME........   FORMAT   S/M   ASSOC...
+@ID            D      0                         ARTISTS        30L      S
+ARTIST.ID      D      0                         Record ID
+NAME           D      1                         Artist/band             S
+                                                name
+MEMBERS        D      2                         Members                 M
+GENRES         D      3                         Genres                  M
+COUNTRY        D      4                         Country                 S
+ACTIVE.YEARS   D      5                         Active Yrs              M
+
